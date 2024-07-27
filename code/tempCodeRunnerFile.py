@@ -33,7 +33,6 @@ def chat_history(cursor_temporary):
     print(temporary_chat)
     return temporary_chat
 
-temporary_chat = chat_history(cursor_temporary)
 
 # Initialize Groq client
 client = Groq()
@@ -48,9 +47,7 @@ def has_internet():
 #OpenWakeWord Library for Wake Word
 
 def get_groq_response(command, memories, temporary_chat):
-    # Formatting chat history as a string
-    chat_history_formatted = "\n".join(f"User: {chat[0]}, AI: {chat[1]}" for chat in temporary_chat)
-    system_prompt = f"You are an assistant that provides short answers only. Use these memories and the recent chat history to give personalized answers:\n\nMemories: {memories}\n\nChat History:\n{chat_history_formatted}"
+    system_prompt = f"You are an assistant that provides short answers only. Use these memories and the recent chat history to give personalized answers:\n\nMemories: {memories}\n\nChat History:\n{temporary_chat}"
 
     completion = client.chat.completions.create(
         model="llama-3.1-8b-instant",
