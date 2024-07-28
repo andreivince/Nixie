@@ -12,28 +12,85 @@ import requests
 import sqlite3
 from groq import Groq
 
+
+
+import requests
+
+
+def play_voice(text):
+    url = "https://api.elevenlabs.io/v1/text-to-speech/EXAVITQu4vr4xnSDxMaL"
+    headers = {
+        "Accept": "audio/mpeg",
+        "Content-Type": "application/json",
+        "xi-api-key": "sk_73fab51d1802ff5316594e7f9b376cf4f8a12fa901eefe6d"
+    }
+    data = {
+        "text": text,
+        "model_id": "eleven_monolingual_v1",
+        "voice_settings": {
+            "stability": 0.5,
+            "similarity_boost": 0.5
+        }
+    }
+
+    # Make the API request
+    response = requests.post(url, json=data, headers=headers)
+    if response.status_code == 200:
+        # Save the response content to a file
+        with open('temp_voice.mp3', 'wb') as f:
+            f.write(response.content)
+        
+        # Initialize pygame mixer
+        pygame.mixer.init()
+        pygame.mixer.music.load("temp_voice.mp3")
+        pygame.mixer.music.play()
+
+        # Wait until the audio finishes playing
+        while pygame.mixer.music.get_busy():
+            pass
+
+        # Remove the temporary audio file
+        os.remove("temp_voice.mp3")
+    else:
+        print("Failed to generate speech:", response.status_code, response.text)
+
+
+
+
+
+
+
+
 connection = sqlite3.connect("memory.db")
 cursor = connection.cursor()
-# cursor.execute("CREATE TABLE memories(id, text)")
-# cursor.execute("""INSERT INTO memories VALUES(6,'Nixie is friend with R2D2')""")
-# cursor.execute("DELETE from memories where id = 4 ")
 connection.commit()
 database_results = cursor.execute("SELECT * FROM memories")
 memories = database_results.fetchall()
 
-connection_temporary = sqlite3.connect("temporary_chat.db")
-cursor_temporary = connection_temporary.cursor()
-cursor_temporary.execute("DROP TABLE IF EXISTS temporary_chat")
-cursor_temporary.execute("CREATE TABLE IF NOT EXISTS temporary_chat (textUser TEXT, answer TEXT)")
-connection_temporary.commit()
+# Establishing temporary chat database connection
+def create_temporary_chat_db():
+    connection_temporary = sqlite3.connect("temporary_chat.db")
+    cursor_temporary = connection_temporary.cursor()
+    cursor_temporary.execute("DROP TABLE IF EXISTS temporary_chat")
+    cursor_temporary.execute("CREATE TABLE IF NOT EXISTS temporary_chat (textUser TEXT, answer TEXT)")
+    connection_temporary.commit()
+    connection_temporary.close()
 
-def chat_history(cursor_temporary):
-    temporary_chat_results = cursor_temporary.execute("SELECT * FROM temporary_chat")
-    temporary_chat = temporary_chat_results.fetchall()
-    print(temporary_chat)
-    return temporary_chat
+create_temporary_chat_db()
 
-temporary_chat = chat_history(cursor_temporary)
+def insert_chat_history(user_input, ai_response):
+    connection_temporary = sqlite3.connect("temporary_chat.db")
+    cursor_temporary = connection_temporary.cursor()
+    cursor_temporary.execute("INSERT INTO temporary_chat (textUser, answer) VALUES (?, ?)", (user_input, ai_response))
+    connection_temporary.commit()
+    connection_temporary.close()
+
+def chat_history():
+    connection_temporary = sqlite3.connect("temporary_chat.db")
+    cursor_temporary = connection_temporary.cursor()
+    results = cursor_temporary.execute("SELECT textUser, answer FROM temporary_chat").fetchall()
+    connection_temporary.close()
+    return results
 
 # Initialize Groq client
 client = Groq()
@@ -44,14 +101,21 @@ def has_internet():
         return True
     except requests.ConnectionError:
         return False
-#Use OpenCV to optimize the video later
-#OpenWakeWord Library for Wake Word
 
-def get_groq_response(command, memories, temporary_chat):
-    # Formatting chat history as a string
+def get_groq_response(command, memories):
+    temporary_chat = chat_history()
     chat_history_formatted = "\n".join(f"User: {chat[0]}, AI: {chat[1]}" for chat in temporary_chat)
-    system_prompt = f"You are an assistant that provides short answers only. Use these memories and the recent chat history to give personalized answers:\n\nMemories: {memories}\n\nChat History:\n{chat_history_formatted}"
+    system_prompt = f"""
+        You are an assistant trained to provide concise and short responses. You have access to memories where the creator stores information so you can customize the answers and recent chat interactions so you can have context what is being said. Here's the context you need:
 
+        Memories:
+        {memories}
+
+        Recent Chat History:
+        {chat_history_formatted}
+
+        Based on the above information, respond to the user's current command shortly.
+        """
     completion = client.chat.completions.create(
         model="llama-3.1-8b-instant",
         messages=[
@@ -127,21 +191,12 @@ def play_video(video_path):
     thread.start()
 
 
-# Function to generate and play a voice response
-def play_voice(text):
-    tts = gTTS(text=text, lang='en')
-    tts.save("temp_voice.mp3")
-    pygame.mixer.init()
-    pygame.mixer.music.load("temp_voice.mp3")
-    pygame.mixer.music.play()
-    while pygame.mixer.music.get_busy():
-        pass  # Wait until the audio finishes playing
-    os.remove("temp_voice.mp3")  # Remove the temporary audio file
+
 
 # Function to get the appropriate response based on user input
 def get_response(command, memories):
     if has_internet():
-        response_text, emotion = get_groq_response(command, memories, temporary_chat)
+        response_text, emotion = get_groq_response(command, memories)
     else:
         responses = load_responses('responses.json')
         response_data = responses.get(command.lower(), {"answer": "I don't understand that command.", "emotion": "normal"})
