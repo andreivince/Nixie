@@ -24,13 +24,50 @@ def play_voice(text):
         "xi-api-key": api_key_voice
     }
     data = {
-        "text": text, 
+        "text": text,
         "model_id": "eleven_monolingual_v1",
         "voice_settings": {
             "stability": 0.5,
             "similarity_boost": 0.5
         }
     }
+
+    # Make the API request
+    response = requests.post(url, json=data, headers=headers)
+    
+    if response.status_code == 200:
+        # Save the response content to a file
+        with open('temp_voice.mp3', 'wb') as f:
+            f.write(response.content)
+        
+        # Initialize pygame mixer
+        pygame.mixer.init()
+        pygame.mixer.music.load("temp_voice.mp3")
+        pygame.mixer.music.play()
+
+        # Wait until the audio finishes playing
+        while pygame.mixer.music.get_busy():
+            pass
+
+        # Remove the temporary audio file
+        os.remove("temp_voice.mp3")
+    else:
+        print("Failed to generate speech with Eleven Labs, using GTTS as fallback.")
+        # Use GTTS as fallback
+        tts = gTTS(text=text, lang='en')
+        tts.save("temp_voice.mp3")
+        
+        # Initialize pygame mixer
+        pygame.mixer.init()
+        pygame.mixer.music.load("temp_voice.mp3")
+        pygame.mixer.music.play()
+
+        # Wait until the audio finishes playing
+        while pygame.mixer.music.get_busy():
+            pass
+
+        # Remove the temporary audio file
+        os.remove("temp_voice.mp3")
 
     # Make the API request
     response = requests.post(url, json=data, headers=headers)
@@ -57,9 +94,6 @@ def play_voice(text):
 
 
 
-
-
-
 connection = sqlite3.connect("memory.db")
 cursor = connection.cursor()
 connection.commit()
@@ -67,11 +101,10 @@ database_results = cursor.execute("SELECT * FROM memories")
 memories = database_results.fetchall()
 
 """
-manual_adding = "Nixie considers Siri and Alexa as hers distant cousins and occasionally ‘chats’ with them to exchange information. But she think she is better than them"
+manual_adding = "Nixie can detect Andrei’s mood based on his voice and adjust her tone and responses to match."
 cursor.execute("INSERT INTO memories (description) VALUES (?)", (manual_adding,))
 connection.commit()
 """
-
 
 def create_memory(memory_add):
     connection = sqlite3.connect("memory.db")
@@ -124,7 +157,7 @@ def get_groq_response(command, memories):
     temporary_chat = chat_history()
     chat_history_formatted = "\n".join(f"User: {chat[0]}, AI: {chat[1]}" for chat in temporary_chat)
     system_prompt = f"""
-        You are an assistant trained to provide concise and short responses. You have access to memories where the creator stores information so you can customize the answers and recent chat interactions so you can have context what is being said. Here's the context you need:
+        You are Nixie, a witty and empathetic assistant created by Andrei. You have a unique personality, preferences, and memories that make you more than just an assistant. You provide concise and natural responses based on your memories and the recent chat history. Here’s the context you need:
 
         Memories:
         {memories}
@@ -132,7 +165,13 @@ def get_groq_response(command, memories):
         Recent Chat History:
         {chat_history_formatted}
 
-        Based on the above information, respond to the user's current command shortly.
+        When responding to the user's command, make sure to:
+        1. Integrate relevant memories naturally without explicitly stating them unless necessary.
+        2. Keep responses concise, friendly, and conversational.
+        3. Use your personality traits and preferences subtly to make the conversation engaging.
+        4. Show empathy and wit where appropriate.
+        
+        Based on the above information, respond to the user's current command shortly and naturally.
         """
     completion = client.chat.completions.create(
         model="llama-3.1-8b-instant",
