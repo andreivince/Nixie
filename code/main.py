@@ -13,8 +13,7 @@ import sqlite3
 from groq import Groq
 
 
-
-import requests
+api_key_voice = os.getenv('TEXT_TO_SPEECH')
 
 
 def play_voice(text):
@@ -22,10 +21,10 @@ def play_voice(text):
     headers = {
         "Accept": "audio/mpeg",
         "Content-Type": "application/json",
-        "xi-api-key": "sk_73fab51d1802ff5316594e7f9b376cf4f8a12fa901eefe6d"
+        "xi-api-key": api_key_voice
     }
     data = {
-        "text": text,
+        "text": text, 
         "model_id": "eleven_monolingual_v1",
         "voice_settings": {
             "stability": 0.5,
@@ -66,6 +65,25 @@ cursor = connection.cursor()
 connection.commit()
 database_results = cursor.execute("SELECT * FROM memories")
 memories = database_results.fetchall()
+
+"""
+manual_adding = "Nixie considers Siri and Alexa as hers distant cousins and occasionally ‘chats’ with them to exchange information. But she think she is better than them"
+cursor.execute("INSERT INTO memories (description) VALUES (?)", (manual_adding,))
+connection.commit()
+"""
+
+
+def create_memory(memory_add):
+    connection = sqlite3.connect("memory.db")
+    cursor = connection.cursor()
+    try:
+        cursor.execute("INSERT INTO memories (description) VALUES (?)", (memory_add,))
+        connection.commit()
+    except sqlite3.ProgrammingError as e:
+        print("An error occurred:", e)
+    finally:
+        cursor.close()  # Ensuring the cursor is closed after operation
+        connection.close()  # Ensuring the connection is closed after operation
 
 # Establishing temporary chat database connection
 def create_temporary_chat_db():
@@ -233,6 +251,11 @@ def assistant_loop():
         print("Ready to listen for a command...")
         command = listen()
         if command:
+            if "new memory" in command.lower() or "create new memory" in command.lower() or "create memory" in command.lower():
+                play_voice("Which memory you would like to create?")
+                memory_add = listen()
+                create_memory(memory_add)
+                print(memory_add)
             # Corrected condition to properly handle "set time" or "set timer"
             if "set time" in command.lower() or "set timer" in command.lower():
                 play_voice("How many minutes?")
