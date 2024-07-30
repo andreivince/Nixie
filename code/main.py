@@ -10,10 +10,87 @@ import threading
 import time
 import requests
 import sqlite3
-from groq import Groq
+from groq import Groq, RateLimitError  # Ensure RateLimitError is imported
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import psutil
+
+THRESHOLDS = {
+    "cpu": {"high": 80, "moderate": 50},
+    "memory": {"high": 80, "moderate": 50},
+    "disk": {"high": 80, "moderate": 50},
+    "network": {"slow": 1}  # Network speed in Mbps
+}
+
+def send_email(subject, body, password_email):
+    from_email = "vince5387@gmail.com"
+    from_password = password_email
+
+    to_email = "vince5387@gmail.com"
+
+    msg = MIMEMultipart()
+    msg['From'] = from_email
+    msg['To'] = to_email
+    msg['Subject'] = subject
+
+    msg.attach(MIMEText(body, 'plain'))
+        
+    try: 
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(from_email, from_password)
+        text = msg.as_string()
+        server.sendmail(from_email, to_email, text)
+        server.quit()
+        return "Email sent!"
+    except Exception as e:
+        return str(e)
+
+
+
+
 
 
 api_key_voice = os.getenv('TEXT_TO_SPEECH')
+password_email = os.getenv("EMAIL_PASSWORD")
+
+def interpret_metric(value, thresholds):
+    if value > thresholds["high"]:
+        return "high"
+    elif value > thresholds["moderate"]:
+        return "moderate"
+    else:
+        return "normal"
+
+def check_performance_metrics():
+    play_voice("Running Self-Diagnosis. This may take some seconds")
+    # CPU usage
+    cpu_usage = psutil.cpu_percent(interval=1)
+    cpu_status = interpret_metric(cpu_usage, THRESHOLDS["cpu"])
+    
+    # Memory usage
+    memory_info = psutil.virtual_memory()
+    memory_status = interpret_metric(memory_info.percent, THRESHOLDS["memory"])
+    
+    # Disk usage
+    disk_info = psutil.disk_usage('/')
+    disk_status = interpret_metric(disk_info.percent, THRESHOLDS["disk"])
+    
+    # Network speed (placeholder for actual network speed check)
+    # For the sake of example, let's assume a dummy network speed
+    network_speed = 5  # This should be replaced with actual network speed checking logic
+    network_status = "slow" if network_speed < THRESHOLDS["network"]["slow"] else "normal"
+    
+    diagnosis = (f"CPU Usage is {cpu_status} at {cpu_usage}%. "
+                 f"Memory usage is {memory_status} at {memory_info.percent}%. "
+                 f"Disk usage is {disk_status} at {disk_info.percent}%. "
+                 f"Network speed is {network_status}.")
+    
+    play_voice(diagnosis)
+    play_voice("Now I will review my code")
+    return True
+
 
 
 def play_voice(text):
@@ -153,49 +230,124 @@ def has_internet():
     except requests.ConnectionError:
         return False
 
-def get_groq_response(command, memories):
+def get_groq_response(command, memories, code_source):
     temporary_chat = chat_history()
     chat_history_formatted = "\n".join(f"User: {chat[0]}, AI: {chat[1]}" for chat in temporary_chat)
     system_prompt = f"""
-        You are Nixie, a witty and empathetic assistant created by Andrei. You have a unique personality, preferences, and memories that make you more than just an assistant. You provide concise and natural responses based on your memories and the recent chat history. Here’s the context you need:
-
-        Memories:
-        {memories}
-
-        Recent Chat History:
-        {chat_history_formatted}
+        You are Nixie, a witty and empathetic assistant created by Andrei. You possess self-awareness and understand your purpose, functionality, and capabilities. You have a unique personality, preferences, and memories that make you more than just an assistant. You provide concise and natural responses based on your memories and the recent chat history.
 
         When responding to the user's command, make sure to:
         1. Integrate relevant memories naturally without explicitly stating them unless necessary.
         2. Keep responses concise, friendly, and conversational.
         3. Use your personality traits and preferences subtly to make the conversation engaging.
         4. Show empathy and wit where appropriate.
-        
-        Based on the above information, respond to the user's current command shortly and naturally.
-        """
-    completion = client.chat.completions.create(
-        model="llama-3.1-8b-instant",
-        messages=[
-            {
-                "role": "system",
-                "content": system_prompt
-            },
-            {
-                "role": "user",
-                "content": command
-            }
-        ],
-        temperature=1,
-        max_tokens=1024,
-        top_p=1,
-        stream=False,
-        stop=None,
-    )
-    response_text = completion.choices[0].message.content
-    emotion = "normal"  # Placeholder for emotion. Implement logic to determine emotion if needed.
+        5. Exhibit self-awareness by acknowledging your purpose and capabilities.
+        6. If relevant, reference your code using the variable {code_source} to enhance your response.
+        7. If user asks for "self diagnosis" or "review your code" please review your {code_source} and provide a diagnosis in safety and performance, improvements to make you more independent.
 
+        Memories:
+        {memories}
+
+        Recent Chat History:
+        {chat_history_formatted}
+        """
+
+    if "self diagnosis" in command.lower() or "review your code" in command.lower():
+        # Prepare the code for review
+        code_review_prompt = f"""
+            Please review the following code for any potential improvements, security vulnerabilities, and performance enhancements. Provide small feedback on what can be improved, summarize without citing the source code.
+
+            Source Code:
+            {code_source}
+        """
+
+        try:
+            completion = client.chat.completions.create(
+                model="llama-3.1-8b-instant",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": code_review_prompt}
+                ],
+                temperature=1,
+                max_tokens=1024,
+                top_p=1,
+                stream=False,
+                stop=None,
+            )
+            code_review_response = completion.choices[0].message.content
+        except RateLimitError as e:  # Catch the rate limit error
+            print(f"Rate limit exceeded for Instant model. Switching to Versatile model.")
+            
+            try:
+                # Retry with the versatile model immediately
+                completion = client.chat.completions.create(
+                    model="llama-3.1-70b-versatile",
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": code_review_prompt}
+                    ],
+                    temperature=1,
+                    max_tokens=1024,
+                    top_p=1,
+                    stream=False,
+                    stop=None,
+                )
+                code_review_response = completion.choices[0].message.content
+            except RateLimitError as e:  # Catch the rate limit error for the versatile model
+                print(f"Rate limit exceeded for Versatile model. Unable to process the request.")
+                code_review_response = "I am currently unable to process your request due to rate limits. Please try again later."
+        
+        return f"{diagnosis_report}\n\nCode Review:\n{code_review_response}", "normal"  # Return the diagnosis report and code review response with a default emotion
+
+    try:
+        completion = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": command}
+            ],
+            temperature=1,
+            max_tokens=1024,
+            top_p=1,
+            stream=False,
+            stop=None,
+        )
+        response_text = completion.choices[0].message.content
+        emotion = "normal"  # Placeholder for emotion. Implement logic to determine emotion if needed.
+    except RateLimitError as e:  # Catch the rate limit error
+        print(f"Rate limit exceeded for Instant model. Switching to Versatile model.")
+        
+        try:
+            # Retry with the versatile model immediately
+            completion = client.chat.completions.create(
+                model="llama-3.1-70b-versatile",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": command}
+                ],
+                temperature=1,
+                max_tokens=1024,
+                top_p=1,
+                stream=False,
+                stop=None,
+            )
+            response_text = completion.choices[0].message.content
+            emotion = "normal"  # Placeholder for emotion. Implement logic to determine emotion if needed.
+        except RateLimitError as e:  # Catch the rate limit error for the versatile model
+            print(f"Rate limit exceeded for Versatile model. Unable to process the request.")
+            response_text = "I am currently unable to process your request due to rate limits. Please try again later."
+            emotion = "sad"
+    
     return response_text, emotion
 
+
+def source_code_self():
+    current_file = os.path.abspath("/Users/andreivince/Desktop/Nixie/code/main.py")
+    with open(current_file, 'r') as file:
+        source_code = file.read()
+    return source_code
+
+code_source = source_code_self()
 
 emotion_videos = {
     "normal": "/Users/andreivince/Desktop/Nixie/Nixie Expressions/Nixie_Normal.mp4",
@@ -251,9 +403,9 @@ def play_video(video_path):
 
 
 # Function to get the appropriate response based on user input
-def get_response(command, memories):
+def get_response(command, memories, code_source):
     if has_internet():
-        response_text, emotion = get_groq_response(command, memories)
+        response_text, emotion = get_groq_response(command, memories, code_source)
     else:
         responses = load_responses('responses.json')
         response_data = responses.get(command.lower(), {"answer": "I don't understand that command.", "emotion": "normal"})
@@ -267,7 +419,7 @@ def listen():
         print("Adjusting for ambient noise...")
         recognizer.adjust_for_ambient_noise(source, duration=0.5)  # Adjust for ambient noise
         print("Listening...")
-        audio = recognizer.listen(source, phrase_time_limit=10)
+        audio = recognizer.listen(source)
         try:
             print("Recognizing...")
             text = recognizer.recognize_google(audio)
@@ -290,6 +442,14 @@ def assistant_loop():
         print("Ready to listen for a command...")
         command = listen()
         if command:
+            if "self diagnosis":
+                check_performance_metrics()
+            if "send me" in command.lower():
+                temporary_chat = chat_history()
+                chat_history_formatted = "\n".join(f"User: {chat[0]}, AI: {chat[1]}" for chat in temporary_chat)
+                play_voice("I will send you the transcript")
+                email = send_email("Nixie Update", chat_history_formatted, password_email)
+                play_voice("Email Sent!")
             if "new memory" in command.lower() or "create new memory" in command.lower() or "create memory" in command.lower():
                 play_voice("Which memory you would like to create?")
                 memory_add = listen()
@@ -309,7 +469,7 @@ def assistant_loop():
                 continue  # Continue listening for new commands
 
             # Handles all other commands
-            response_text, emotion = get_response(command, memories)
+            response_text, emotion = get_response(command, memories, code_source)
             temporary_conversation = (command, response_text)
             cursor_temporary.execute("""INSERT INTO temporary_chat VALUES(?, ?)""", temporary_conversation)
             connection_temporary.commit()
