@@ -1,0 +1,10 @@
+tk
+Pillow
+imageio
+gtts
+pygame
+requests
+speechrecognition
+groq
+psutil
+pyaudio
