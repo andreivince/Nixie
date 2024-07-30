@@ -64,7 +64,7 @@ def interpret_metric(value, thresholds):
         return "normal"
 
 def check_performance_metrics():
-    play_voice("Running Self-Diagnosis. This may take some seconds")
+    play_voice("Running Self-Diagnosis")
     # CPU usage
     cpu_usage = psutil.cpu_percent(interval=1)
     cpu_status = interpret_metric(cpu_usage, THRESHOLDS["cpu"])
