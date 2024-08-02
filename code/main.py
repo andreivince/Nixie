@@ -22,7 +22,7 @@ import base64
 
 from play_voice import play_voice
 from self_diagnosis import check_performance_metrics
-from memory import create_memory, memories, chat_history
+from memory import create_memory_Nixie, create_memory_Andrei, memories, chat_history
 from timer_function import set_timer, convert_word_to_number
 
 
@@ -148,10 +148,16 @@ def assistant_loop():
                 email = send_email("Nixie Update", chat_history_formatted, password_email)
                 play_voice("Email Sent!")
             if "new memory" in command.lower() or "create new memory" in command.lower() or "create memory" in command.lower():
-                play_voice("Which memory you would like to create?")
-                memory_add = listen()
-                create_memory(memory_add)
-                print(memory_add)
+                play_voice("Andrei's Memory or Nixie's Memory")
+                database_confirmation = listen()
+                if "Andrei" in database_confirmation.lower():
+                    play_voice("Which memory you would like to create?")
+                    memory_add = listen()
+                    create_memory_Andrei(memory_add)
+                if "Nixie" in database_confirmation.lower():
+                    play_voice("Which memory you would like to create?")
+                    memory_add = listen()
+                    create_memory_Nixie(memory_add)
             if "set time" in command.lower() or "set timer" in command.lower():
                 play_voice("How many minutes?")
                 time_confirmation = listen()

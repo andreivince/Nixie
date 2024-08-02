@@ -29,7 +29,7 @@ from self_diagnosis import check_performance_metrics
 connection = sqlite3.connect("memory.db")
 cursor = connection.cursor()
 connection.commit()
-database_results = cursor.execute("SELECT * FROM memories")
+database_results = cursor.execute("SELECT * FROM Nixie_Memories")
 memories = database_results.fetchall()
 
 """
@@ -38,11 +38,23 @@ cursor.execute("INSERT INTO memories (description) VALUES (?)", (manual_adding,)
 connection.commit()
 """
 
-def create_memory(memory_add):
+def create_memory_Nixie(memory_add):
     connection = sqlite3.connect("memory.db")
     cursor = connection.cursor()
     try:
-        cursor.execute("INSERT INTO memories (description) VALUES (?)", (memory_add,))
+        cursor.execute("INSERT INTO Nixie_Memories (description) VALUES (?)", (memory_add,))
+        connection.commit()
+    except sqlite3.ProgrammingError as e:
+        print("An error occurred:", e)
+    finally:
+        cursor.close()  # Ensuring the cursor is closed after operation
+        connection.close()  # Ensuring the connection is closed after operation
+
+def create_memory_Andrei(memory_add):
+    connection = sqlite3.connect("memory.db")
+    cursor = connection.cursor()
+    try:
+        cursor.execute("INSERT INTO Andrei_Vince_Memories (description) VALUES (?)", (memory_add,))
         connection.commit()
     except sqlite3.ProgrammingError as e:
         print("An error occurred:", e)
@@ -51,6 +63,7 @@ def create_memory(memory_add):
         connection.close()  # Ensuring the connection is closed after operation
 
 
+# Temporary Chat
 def create_temporary_chat_db():
     connection_temporary = sqlite3.connect("temporary_chat.db")
     cursor_temporary = connection_temporary.cursor()

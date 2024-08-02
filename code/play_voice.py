@@ -61,7 +61,7 @@ def play_voice(text):
 
         # Attempt to use Eleven Labs API as fallback
         try:
-            eleven_labs_url = "https://api.elevenlabs.io/v1/text-to-speech/EXAVITQu4vr4xnSDxMaL"
+            url = "https://api.elevenlabs.io/v1/text-to-speech/EXAVITQu4vr4xnSDxMaL"
             headers = {
                 "Accept": "audio/mpeg",
                 "Content-Type": "application/json",
@@ -76,7 +76,7 @@ def play_voice(text):
                 }
             }
 
-            response = requests.post(eleven_labs_url, json=data, headers=headers)
+            response = requests.post(url, json=data, headers=headers)
             response.raise_for_status()
 
             # Save the response content to a file
