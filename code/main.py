@@ -150,7 +150,7 @@ def assistant_loop():
             if "new memory" in command.lower() or "create new memory" in command.lower() or "create memory" in command.lower():
                 play_voice("Andrei's Memory or Nixie's Memory")
                 database_confirmation = listen()
-                if "Andrei" in database_confirmation.lower():
+                if "Andrei" in database_confirmation.lower() or "Andre" in database_confirmation.lower():
                     play_voice("Which memory you would like to create?")
                     memory_add = listen()
                     create_memory_Andrei(memory_add)
@@ -170,6 +170,7 @@ def assistant_loop():
                         play_voice("Sorry, I didn't understand the number.")
                 continue
             response_text, emotion = get_response(command, memories, code_source)
+            print(response_text)
             temporary_conversation = (command, response_text)
             cursor_temporary.execute("""INSERT INTO temporary_chat VALUES(?, ?)""", temporary_conversation)
             connection_temporary.commit()

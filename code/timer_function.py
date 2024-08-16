@@ -24,7 +24,6 @@ import base64
 
 from play_voice import play_voice
 from self_diagnosis import check_performance_metrics
-from memory import create_memory, memories
 
 word_to_number = {
     "zero": 0,
