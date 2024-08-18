@@ -24,8 +24,7 @@ from play_voice import play_voice
 from self_diagnosis import check_performance_metrics
 from memory import create_memory_Nixie, create_memory_Andrei, memories_Nixie, memories_Andrei, chat_history
 from timer_function import set_timer, convert_word_to_number
-
-
+print("Hey")
 # Utility Functions
 def has_internet():
     try:
