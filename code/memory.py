@@ -30,7 +30,9 @@ connection = sqlite3.connect("memory.db")
 cursor = connection.cursor()
 connection.commit()
 database_results = cursor.execute("SELECT * FROM Nixie_Memories")
-memories = database_results.fetchall()
+memories_Nixie = database_results.fetchall()
+database_results_Andrei = cursor.execute("SELECT * FROM Andrei_Vince_Memories")
+memories_Andrei = database_results_Andrei.fetchall
 
 """
 manual_adding = "Nixie can detect Andrei’s mood based on his voice and adjust her tone and responses to match."

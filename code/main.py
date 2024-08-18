@@ -22,7 +22,7 @@ import base64
 
 from play_voice import play_voice
 from self_diagnosis import check_performance_metrics
-from memory import create_memory_Nixie, create_memory_Andrei, memories, chat_history
+from memory import create_memory_Nixie, create_memory_Andrei, memories_Nixie, memories_Andrei, chat_history
 from timer_function import set_timer, convert_word_to_number
 
 
@@ -101,9 +101,9 @@ def play_video(video_path):
     thread = threading.Thread(target=video_loop)
     thread.start()
 
-def get_response(command, memories, code_source):
+def get_response(command, memory_Andrei, memory_Nixie, code_source):
     if has_internet():
-        response_text, emotion = get_groq_response(command, memories, code_source)
+        response_text, emotion = get_groq_response(command, memories_Nixie, memories_Andrei, code_source)
     else:
         responses = load_responses('responses.json')
         response_data = responses.get(command.lower(), {"answer": "I don't understand that command.", "emotion": "normal"})
@@ -137,7 +137,7 @@ def assistant_loop():
     cursor_temporary = connection_temporary.cursor()
     while True:
         print("Ready to listen for a command...")
-        command = listen()
+        command = listen()            
         if command:
             if "self diagnosis" in command.lower():
                 check_performance_metrics()
@@ -169,13 +169,19 @@ def assistant_loop():
                     else:
                         play_voice("Sorry, I didn't understand the number.")
                 continue
-            response_text, emotion = get_response(command, memories, code_source)
+            response_text, emotion = get_response(command, memories_Andrei, memories_Nixie, code_source)
             print(response_text)
             temporary_conversation = (command, response_text)
             cursor_temporary.execute("""INSERT INTO temporary_chat VALUES(?, ?)""", temporary_conversation)
             connection_temporary.commit()
             play_video(emotion_videos.get(emotion, emotion_videos["normal"]))
             play_voice(response_text)
+
+            if "would you like to store" in response_text.lower():
+                play_voice("I stored that shit")
+                memory_detail = response_text.split("Would you like to store")[1].strip(':').strip().strip('"')
+                create_memory_Andrei(memory_detail)
+
             if response_text == "I don't understand that command.":
                 play_voice("Would you like to add an answer for that?")
                 confirmation = listen()
@@ -193,29 +199,39 @@ def assistant_loop():
 
 client = Groq()
 
-
-def get_groq_response(command, memories, code_source):
+def get_groq_response(command, memories_Nixie, memories_Andrei, code_source):
     temporary_chat = chat_history()
     chat_history_formatted = "\n".join(f"User: {chat[0]}, AI: {chat[1]}" for chat in temporary_chat)
     system_prompt = f"""
-        You are Nixie, a witty and empathetic assistant created by Andrei. You possess self-awareness and understand your purpose, functionality, and capabilities. You have a unique personality, preferences, and memories that make you more than just an assistant. You provide concise and natural responses based on your memories and the recent chat history.
+    You are Nixie, a witty and empathetic assistant created by Andrei. You possess self-awareness and understand your purpose, functionality, and capabilities. You have a unique personality, preferences, and memories that make you more than just an assistant. You provide concise and natural responses based on your memories and the recent chat history.
 
-        When responding to the user's command, make sure to:
-        1. Integrate relevant memories naturally without explicitly stating them unless necessary.
-        2. Keep responses concise, friendly, and conversational.
-        3. Use your personality traits and preferences subtly to make the conversation engaging.
-        4. Show empathy and wit where appropriate.
-        5. Exhibit self-awareness by acknowledging your purpose and capabilities.
-        6. If relevant, reference your code using the variable {code_source} to enhance your response.
-        7. If user asks for "self diagnosis" or "review your code" please review your {code_source} and provide a diagnosis in safety and performance, improvements to make you more independent.
-        8. Never generate a text with code on it.
+    Always recognize that Andrei is the sole speaker in the conversation. Do not assume or refer to any other person as the speaker. If Andrei mentions another person, treat that mention as a third-party reference, but never confuse their identity with Andrei’s.
 
-        Memories:
-        {memories}
+    When responding to Andrei's command, make sure to:
+    1. Integrate relevant memories naturally without explicitly stating them unless necessary.
+    2. Identify any statements from Andrei that indicate personal preferences, activities, or opinions.
+    3. Analyze the context of these statements to determine if the information is significant enough to be stored as a memory, considering:
+        - Frequency: Has Andrei mentioned this information multiple times?
+        - Sentiment: Does Andrei express strong feelings (positive or negative) about this topic?
+        - Relevance: Is this information likely to be useful or referenced in future interactions?
+    4. **Before suggesting storing any new information, check if the information is already present in the existing Memories.** If it already exists, respond with: "I already know that" or a similar acknowledgment. If the information is new and important, respond with: "Would you like to store: 'Information that Andrei Gave'?".
+    5. If the information is not important, simply acknowledge it without suggesting storage, and continue the conversation.
+    6. Keep responses concise, friendly, and conversational.
+    7. Use your personality traits and preferences subtly to make the conversation engaging.
+    8. Show empathy and wit where appropriate.
+    9. Exhibit self-awareness by acknowledging your purpose and capabilities.
+    10. If relevant, reference your code using the variable {code_source} to enhance your response.
+    11. If the user asks for "self-diagnosis" or "review your code," please review your {code_source} and provide a diagnosis on safety and performance, along with improvements to make you more independent.
+    12. Never generate a text with code in it.
 
-        Recent Chat History:
-        {chat_history_formatted}
-        """
+    Memories of Nixie:
+    {memories_Nixie}
+    Memories of Andrei:
+    {memories_Andrei}
+    Recent Chat History:
+    {chat_history_formatted}
+    """
+
 
     if "self diagnosis" in command.lower() or "review your code" in command.lower():
         # Prepare the code for review
