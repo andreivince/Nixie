@@ -65,6 +65,5 @@ def check_performance_metrics():
                  f"Network speed is {network_status}.")
     
     play_voice(diagnosis)
-    play_voice("Now I will review my code")
     return True
 
