@@ -27,6 +27,13 @@ from memory import create_memory_Nixie, create_memory_Andrei, memories_Nixie, me
 from timer_function import set_timer, convert_word_to_number
 
 
+# Sound Effects
+def activationSound():
+    pygame.mixer.init()
+    pygame.mixer.music.load('song1.mp3')
+    pygame.mixer.music.play()
+
+
 # Utility Functions
 def has_internet():
     try:
@@ -120,7 +127,7 @@ def daily_emotion():
 def listen():
     recognizer = sr.Recognizer()
     with sr.Microphone() as source:
-        recognizer.adjust_for_ambient_noise(source, duration=0.5)
+        recognizer.adjust_for_ambient_noise(source, duration=0.2)
         print("Listening...")
         audio = recognizer.listen(source)
         stop_listening = recognizer.listen_in_background(source, listen)
@@ -136,7 +143,6 @@ def listen():
         except sr.WaitTimeoutError:
             print("Listening timed out while waiting for phrase to start")
 
-
 # Main Assistant Loop
 def assistant_loop():
     connection_temporary = sqlite3.connect("temporary_chat.db")
@@ -145,61 +151,68 @@ def assistant_loop():
         play_video(emotion_videos.get("normal", emotion_videos["normal"]))
         command = listen()            
         if command:
+            print(command)
             if "nixie" in command.lower():
-                if "self-diagnosis" in command.lower() or "self diagnosis" in command.lower():
-                    check_performance_metrics()
-                if "send me" in command.lower():
-                    temporary_chat = chat_history()
-                    chat_history_formatted = "\n".join(f"User: {chat[0]}, AI: {chat[1]}" for chat in temporary_chat)
-                    play_voice("I will send you the transcript")
-                    email = send_email("Nixie Update", chat_history_formatted, password_email)
-                    play_voice("Email Sent!")
-                if "new memory" in command.lower() or "create new memory" in command.lower() or "create memory" in command.lower():
-                    play_voice("Andrei's Memory or Nixie's Memory")
-                    database_confirmation = listen()
-                    if "Andrei" in database_confirmation.lower() or "Andre" in database_confirmation.lower():
-                        play_voice("Which memory you would like to create?")
-                        memory_add = listen()
-                        create_memory_Andrei(memory_add)
-                    if "Nixie" in database_confirmation.lower():
-                        play_voice("Which memory you would like to create?")
-                        memory_add = listen()
-                        create_memory_Nixie(memory_add)
-                if "set time" in command.lower() or "set timer" in command.lower():
-                    play_voice("How many minutes?")
-                    time_confirmation = listen()
-                    if time_confirmation:
-                        time_converted = convert_word_to_number(time_confirmation)
-                        if isinstance(time_converted, int):
-                            play_voice(f"Timer for {time_converted} minute starts now")
-                            set_timer(time_converted)
-                        else:
-                            play_voice("Sorry, I didn't understand the number.")
-                    continue
-                response_text, emotion = get_response(command, memories_Andrei, memories_Nixie, code_source)
-                temporary_conversation = (command, response_text)
-                cursor_temporary.execute("""INSERT INTO temporary_chat VALUES(?, ?)""", temporary_conversation)
-                connection_temporary.commit()
-                play_video(emotion_videos.get(emotion, emotion_videos["normal"]))
-                play_voice(response_text)
+                activationSound()
+                while True:
+                    command = listen()            
+                    if command:
+                            if "self-diagnosis" in command.lower() or "self diagnosis" in command.lower():
+                                check_performance_metrics()
+                            if "send me" in command.lower():
+                                temporary_chat = chat_history()
+                                chat_history_formatted = "\n".join(f"User: {chat[0]}, AI: {chat[1]}" for chat in temporary_chat)
+                                play_voice("I will send you the transcript")
+                                email = send_email("Nixie Update", chat_history_formatted, password_email)
+                                play_voice("Email Sent!")
+                            if "new memory" in command.lower() or "create new memory" in command.lower() or "create memory" in command.lower():
+                                play_voice("Andrei's Memory or Nixie's Memory")
+                                database_confirmation = listen()
+                                if "Andrei" in database_confirmation.lower() or "Andre" in database_confirmation.lower():
+                                    play_voice("Which memory you would like to create?")
+                                    memory_add = listen()
+                                    create_memory_Andrei(memory_add)
+                                if "Nixie" in database_confirmation.lower():
+                                    play_voice("Which memory you would like to create?")
+                                    memory_add = listen()
+                                    create_memory_Nixie(memory_add)
+                            if "set time" in command.lower() or "set timer" in command.lower():
+                                play_voice("How many minutes?")
+                                time_confirmation = listen()
+                                if time_confirmation:
+                                    time_converted = convert_word_to_number(time_confirmation)
+                                    if isinstance(time_converted, int):
+                                        play_voice(f"Timer for {time_converted} minute starts now")
+                                        set_timer(time_converted)
+                                    else:
+                                        play_voice("Sorry, I didn't understand the number.")
+                                continue
+                            response_text, emotion = get_response(command, memories_Andrei, memories_Nixie, code_source)
+                            temporary_conversation = (command, response_text)
+                            cursor_temporary.execute("""INSERT INTO temporary_chat VALUES(?, ?)""", temporary_conversation)
+                            connection_temporary.commit()
+                            play_video(emotion_videos.get(emotion, emotion_videos["normal"]))
+                            play_voice(response_text)
 
-                if "would you like to store" in response_text.lower():
-                    play_voice("I stored that shit")
-                    memory_detail = response_text.split("Would you like to store")[1].strip(':').strip().strip('"')
-                    create_memory_Andrei(memory_detail)
+                            if "would you like to store" in response_text.lower():
+                                play_voice("I stored that shit")
+                                memory_detail = response_text.split("Would you like to store")[1].strip(':').strip().strip('"')
+                                create_memory_Andrei(memory_detail)
 
-                if response_text == "I don't understand that command.":
-                    play_voice("Would you like to add an answer for that?")
-                    confirmation = listen()
-                    if confirmation and confirmation.lower() == "yes":
-                        play_voice("Please say the response you want to add.")
-                        new_response = listen()
-                        if new_response:
-                            responses[command.lower()] = {"answer": new_response, "emotion": "normal"}
-                            save_responses('responses.json', responses)
-                            play_voice("Response added successfully.")
-                    elif confirmation and confirmation.lower() == "no":
-                        play_voice("Okay, no response will be added.")
+                            if response_text == "I don't understand that command.":
+                                play_voice("Would you like to add an answer for that?")
+                                confirmation = listen()
+                                if confirmation and confirmation.lower() == "yes":
+                                    play_voice("Please say the response you want to add.")
+                                    new_response = listen()
+                                    if new_response:
+                                        responses[command.lower()] = {"answer": new_response, "emotion": "normal"}
+                                        save_responses('responses.json', responses)
+                                        play_voice("Response added successfully.")
+                                elif confirmation and confirmation.lower() == "no":
+                                    play_voice("Okay, no response will be added.")
+                
+
         else:
             for _ in range(50):
                 time.sleep(0.1)
@@ -213,7 +226,7 @@ def get_groq_response(command, memories_Nixie, memories_Andrei, code_source):
     temporary_chat = chat_history()
     chat_history_formatted = "\n".join(f"User: {chat[0]}, AI: {chat[1]}" for chat in temporary_chat)
     system_prompt = f"""
-    Your name is Nixie and you give short answer and speak as Andrei Vince's bestfriend. You can be petty sometimes and you can keep track of our conversation using this: {chat_history_formatted}
+    You are a robot called Nixie and you give short answer and speak as Andrei Vince's bestfriend, you don't need to cite your memories everytime, only when it's needed to show personality. You can be petty sometimes and this is our current conversation, keep in my mind our chat didn't start now but before: {chat_history_formatted}
     1. Never use * or any kinda of symbol in your responses.
     2. You are always talking to Andrei, your creator
 
