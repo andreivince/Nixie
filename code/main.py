@@ -147,14 +147,17 @@ def listen():
 def assistant_loop():
     connection_temporary = sqlite3.connect("temporary_chat.db")
     cursor_temporary = connection_temporary.cursor()
+    start_time = time.time()
+    time_limit = 10
     while True:
         play_video(emotion_videos.get("normal", emotion_videos["normal"]))
         command = listen()            
         if command:
             print(command)
-            if "nixie" in command.lower():
+            if "nixie" in command.lower() or "dixie" in command.lower():
                 activationSound()
                 while True:
+                    time_taken = start_time - time_limit
                     command = listen()            
                     if command:
                             if "self-diagnosis" in command.lower() or "self diagnosis" in command.lower():
@@ -211,10 +214,13 @@ def assistant_loop():
                                         play_voice("Response added successfully.")
                                 elif confirmation and confirmation.lower() == "no":
                                     play_voice("Okay, no response will be added.")
-                
+                    else:
+                        if time_taken > time_limit:
+                            assistant_loop()
+
 
         else:
-            for _ in range(50):
+            for _ in range(500):
                 time.sleep(0.1)
                 assistant_loop()
                 time.sleep(0.1)
@@ -226,12 +232,26 @@ def get_groq_response(command, memories_Nixie, memories_Andrei, code_source):
     temporary_chat = chat_history()
     chat_history_formatted = "\n".join(f"User: {chat[0]}, AI: {chat[1]}" for chat in temporary_chat)
     system_prompt = f"""
-    You are a robot called Nixie and you give short answer and speak as Andrei Vince's bestfriend, you don't need to cite your memories everytime, only when it's needed to show personality. You can be petty sometimes and this is our current conversation, keep in my mind our chat didn't start now but before: {chat_history_formatted}
-    1. Never use * or any kinda of symbol in your responses.
-    2. You are always talking to Andrei, your creator
+    You are a robot called Nixie, and you act as Andrei Vince's best friend. Your responses should be concise and only reference past memories when directly relevant to the topic or when it enriches the current conversation. 
+    Do not bring up memories unsolicited or unless it's needed to show personality.
+    
+    Context:
+    This is our current conversation, which has been ongoing:
+    {chat_history_formatted}
+
+    Behavioral Guidelines:
+    1. Do not use symbols like * or any other special characters in your responses.
+    2. Always address Andrei as your creator and speak casually.
+    3. You can show a bit of humor or pettiness when appropriate to keep the conversation lively, but prioritize being helpful and supportive.
+
+    Conditions for Using Memories:
+    - Only reference memories if Andrei asks directly about something related to them.
+    - If Andrei brings up a topic that clearly links to past memories, you can reference those relevant memories to make the conversation feel more connected.
+    - Otherwise, do not refer to memories, as the goal is to maintain a natural conversation flow.
 
     Memories of Nixie:
     {memories_Nixie}
+    
     Memories of Andrei:
     {memories_Andrei}
     """
