@@ -25,7 +25,7 @@ from play_voice import play_voice
 from self_diagnosis import check_performance_metrics
 from memory import create_memory_Nixie, create_memory_Andrei, memories_Nixie, memories_Andrei, chat_history
 from timer_function import set_timer, convert_word_to_number
-
+from face_recognize import recognized
 
 # Sound Effects
 def activationSound():
@@ -95,6 +95,23 @@ def save_responses(file_path, responses):
     with open(file_path, 'w') as file:
         json.dump(responses, file, indent=4)
 
+
+def creator_camera():
+    global is_recognized
+    while True:
+        andrei = recognized()  # Call your actual face recognition function
+        if andrei:
+            is_recognized = True
+            play_voice("Andrei, I can see you")  # You can remove this later if not needed
+        else:
+            is_recognized = False
+        time.sleep(1)  # Add a delay to prevent maxing out the CPU
+
+# Start the face recognition in a separate thread
+face_thread = threading.Thread(target=creator_camera)
+face_thread.daemon = True  # Set as daemon so it exits when the main program does
+face_thread.start()
+
 def play_video(video_path):
     video = imageio.get_reader(video_path, 'ffmpeg')
     def video_loop():
@@ -143,6 +160,7 @@ def listen():
         except sr.WaitTimeoutError:
             print("Listening timed out while waiting for phrase to start")
 
+
 # Main Assistant Loop
 def assistant_loop():
     connection_temporary = sqlite3.connect("temporary_chat.db")
@@ -151,7 +169,7 @@ def assistant_loop():
     time_limit = 10
     while True:
         play_video(emotion_videos.get("normal", emotion_videos["normal"]))
-        command = listen()            
+        command = listen()    
         if command:
             print(command)
             if "nixie" in command.lower() or "dixie" in command.lower():
