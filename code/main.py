@@ -96,21 +96,27 @@ def save_responses(file_path, responses):
         json.dump(responses, file, indent=4)
 
 
+is_recognized = False
+
 def creator_camera():
     global is_recognized
     while True:
         andrei = recognized()  # Call your actual face recognition function
-        if andrei:
-            is_recognized = True
-            play_voice("Andrei, I can see you")  # You can remove this later if not needed
-        else:
-            is_recognized = False
-        time.sleep(1)  # Add a delay to prevent maxing out the CPU
+        is_recognized = bool(andrei)
+        time.sleep(1)  # Delay to avoid maxing out CPU
 
 # Start the face recognition in a separate thread
 face_thread = threading.Thread(target=creator_camera)
 face_thread.daemon = True  # Set as daemon so it exits when the main program does
 face_thread.start()
+
+# Wait for recognition in the main thread
+while not is_recognized:
+    time.sleep(0.1)  # Wait for recognition
+
+# Now you can safely assume Andrei is recognized
+Andrei_Here = True
+
 
 def play_video(video_path):
     video = imageio.get_reader(video_path, 'ffmpeg')
@@ -169,11 +175,12 @@ def assistant_loop():
     time_limit = 10
     while True:
         play_video(emotion_videos.get("normal", emotion_videos["normal"]))
-        command = listen()    
+        command = listen()  
         if command:
             print(command)
-            if "nixie" in command.lower() or "dixie" in command.lower():
+            if "nixie" in command.lower() or "dixie" in command.lower() or Andrei_Here == True:
                 activationSound()
+                play_voice("Hey I can see you Andrei")
                 while True:
                     time_taken = start_time - time_limit
                     command = listen()            
